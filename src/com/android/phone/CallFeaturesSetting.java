@@ -53,7 +53,7 @@ import com.android.phone.settings.PhoneAccountSettingsFragment;
 import com.android.phone.settings.VoicemailSettingsActivity;
 import com.android.phone.settings.fdn.FdnSetting;
 
-import com.android.internal.util.liquid.LiquidUtils;
+import com.android.internal.util.du.Utils;
 
 import java.util.List;
 
@@ -412,7 +412,7 @@ public class CallFeaturesSetting extends PreferenceActivity
             /* tm.listen(mPhoneStateListener, PhoneStateListener.LISTEN_CALL_STATE); */
         }
 
-        if (!LiquidUtils.isPackageInstalled(this, "com.qualcomm.qti.ims") && findPreference("ims_settings_key") != null) {
+        if (!Utils.isPackageInstalled(this, "com.qualcomm.qti.ims") && findPreference("ims_settings_key") != null) {
             prefSet.removePreference(findPreference("ims_settings_key"));
         }
 
