@@ -15,7 +15,9 @@ LOCAL_JAVA_LIBRARIES := \
         voip-common \
         ims-common \
         org.apache.http.legacy \
-        libprotobuf-java-nano
+        libprotobuf-java-nano \
+        telephony-ext \
+	    ims-ext-common
 
 LOCAL_STATIC_ANDROID_LIBRARIES := \
         android-support-v7-appcompat \
@@ -24,8 +26,10 @@ LOCAL_STATIC_ANDROID_LIBRARIES := \
         android-support-v14-preference
 
 LOCAL_STATIC_JAVA_LIBRARIES := \
+        ims-ext-common \
         guava \
-        volley
+        volley \
+        ims-ext-common
 
 LOCAL_SRC_FILES := $(call all-java-files-under, $(src_dirs))
 LOCAL_SRC_FILES += $(call all-proto-files-under, ecc/proto)

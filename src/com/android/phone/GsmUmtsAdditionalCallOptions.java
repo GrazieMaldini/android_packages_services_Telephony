@@ -1,6 +1,8 @@
 package com.android.phone;
 
 import android.app.ActionBar;
+import android.content.Context;
+import android.content.Intent;
 import android.os.Bundle;
 import android.os.PersistableBundle;
 import android.preference.Preference;
@@ -28,9 +30,6 @@ public class GsmUmtsAdditionalCallOptions extends TimeConsumingPreferenceActivit
     private Phone mPhone;
     private SubscriptionInfoHelper mSubscriptionInfoHelper;
 
-    private boolean mShowCLIRButton;
-    private boolean mShowCWButton;
-
     @Override
     protected void onCreate(Bundle icicle) {
         super.onCreate(icicle);
@@ -46,59 +45,33 @@ public class GsmUmtsAdditionalCallOptions extends TimeConsumingPreferenceActivit
         mCLIRButton = (CLIRListPreference) prefSet.findPreference(BUTTON_CLIR_KEY);
         mCWButton = (CallWaitingSwitchPreference) prefSet.findPreference(BUTTON_CW_KEY);
 
-        PersistableBundle b = null;
-        if (mSubscriptionInfoHelper.hasSubId()) {
-            b = PhoneGlobals.getInstance().getCarrierConfigForSubId(
-                    mSubscriptionInfoHelper.getSubId());
+        mPreferences.add(mCLIRButton);
+        mPreferences.add(mCWButton);
+
+        if (icicle == null) {
+            if (DBG) Log.d(LOG_TAG, "start to init ");
+            if (isUtEnabledToDisableClir()) {
+                mCLIRButton.setSummary(R.string.sum_default_caller_id);
+                mCWButton.init(this, false, mPhone);
+            } else {
+                mCLIRButton.init(this, false, mPhone);
+            }
         } else {
-            b = PhoneGlobals.getInstance().getCarrierConfig();
-        }
-
-        if (b != null) {
-            mShowCLIRButton = b.getBoolean(
-                    CarrierConfigManager.KEY_ADDITIONAL_SETTINGS_CALLER_ID_VISIBILITY_BOOL);
-            mShowCWButton = b.getBoolean(
-                    CarrierConfigManager.KEY_ADDITIONAL_SETTINGS_CALL_WAITING_VISIBILITY_BOOL);
-        }
-
-        if (mCLIRButton != null) {
-            if (mShowCLIRButton) {
-                mPreferences.add(mCLIRButton);
+            if (DBG) Log.d(LOG_TAG, "restore stored states");
+            mInitIndex = mPreferences.size();
+            if (isUtEnabledToDisableClir()) {
+                mCLIRButton.setSummary(R.string.sum_default_caller_id);
+                mCWButton.init(this, true, mPhone);
             } else {
-                prefSet.removePreference(mCLIRButton);
-            }
-        }
-
-        if (mCWButton != null) {
-            if (mShowCWButton) {
-                mPreferences.add(mCWButton);
-            } else {
-                prefSet.removePreference(mCWButton);
-            }
-        }
-
-        if (mPreferences.size() != 0) {
-            if (icicle == null) {
-                if (DBG) Log.d(LOG_TAG, "start to init ");
-                doPreferenceInit(mInitIndex);
-            } else {
-                if (DBG) Log.d(LOG_TAG, "restore stored states");
-                mInitIndex = mPreferences.size();
-                if (mShowCWButton) {
-                    mCWButton.init(this, true, mPhone);
-                }
-                if (mShowCLIRButton) {
-                    mCLIRButton.init(this, true, mPhone);
-                    int[] clirArray = icicle.getIntArray(mCLIRButton.getKey());
-                    if (clirArray != null) {
-                        if (DBG) {
-                            Log.d(LOG_TAG, "onCreate:  clirArray[0]="
-                                    + clirArray[0] + ", clirArray[1]=" + clirArray[1]);
-                        }
-                        mCLIRButton.handleGetCLIRResult(clirArray);
-                    } else {
-                        mCLIRButton.init(this, false, mPhone);
-                    }
+                mCLIRButton.init(this, true, mPhone);
+                mCWButton.init(this, true, mPhone);
+                int[] clirArray = icicle.getIntArray(mCLIRButton.getKey());
+                if (clirArray != null) {
+                    if (DBG) Log.d(LOG_TAG, "onCreate:  clirArray[0]="
+                            + clirArray[0] + ", clirArray[1]=" + clirArray[1]);
+                    mCLIRButton.handleGetCLIRResult(clirArray);
+                } else {
+                    mCLIRButton.init(this, false, mPhone);
                 }
             }
         }
@@ -110,11 +83,21 @@ public class GsmUmtsAdditionalCallOptions extends TimeConsumingPreferenceActivit
         }
     }
 
+    private boolean isUtEnabledToDisableClir() {
+        boolean skipClir = false;
+        CarrierConfigManager configManager = (CarrierConfigManager)
+            getSystemService(Context.CARRIER_CONFIG_SERVICE);
+        PersistableBundle pb = configManager.getConfigForSubId(mPhone.getSubId());
+        if (pb != null) {
+            skipClir = pb.getBoolean("config_disable_clir_over_ut");
+        }
+        return mPhone.isUtEnabled() && skipClir;
+    }
     @Override
     protected void onSaveInstanceState(Bundle outState) {
         super.onSaveInstanceState(outState);
 
-        if (mShowCLIRButton && mCLIRButton.clirArray != null) {
+        if (mCLIRButton.clirArray != null) {
             outState.putIntArray(mCLIRButton.getKey(), mCLIRButton.clirArray);
         }
     }
@@ -123,7 +106,10 @@ public class GsmUmtsAdditionalCallOptions extends TimeConsumingPreferenceActivit
     public void onFinished(Preference preference, boolean reading) {
         if (mInitIndex < mPreferences.size()-1 && !isFinishing()) {
             mInitIndex++;
-            doPreferenceInit(mInitIndex);
+            Preference pref = mPreferences.get(mInitIndex);
+            if (pref instanceof CallWaitingSwitchPreference) {
+                ((CallWaitingSwitchPreference) pref).init(this, false, mPhone);
+            }
         }
         super.onFinished(preference, reading);
     }
@@ -136,16 +122,5 @@ public class GsmUmtsAdditionalCallOptions extends TimeConsumingPreferenceActivit
             return true;
         }
         return super.onOptionsItemSelected(item);
-    }
-
-    private void doPreferenceInit(int index) {
-        if (mPreferences.size() != 0) {
-            Preference pref = mPreferences.get(index);
-            if (pref instanceof CallWaitingSwitchPreference) {
-                ((CallWaitingSwitchPreference) pref).init(this, false, mPhone);
-            } else if (pref instanceof CLIRListPreference) {
-                ((CLIRListPreference) pref).init(this, false, mPhone);
-            }
-        }
     }
 }
